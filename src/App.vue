@@ -7,7 +7,7 @@ const client = ref<Client>()
 const currentNetwork = ref<string>('')
 const selectedNetwork = ref('MainAlbatross')
 
-const block = ref<number>()
+const block = ref<string>()
 
 const workingNetworks = [
   { value: 'MainAlbatross', label: 'MainAlbatross (UpperCamelCase)' },
@@ -46,7 +46,6 @@ async function connect() {
     })
 
     client.value.addHeadChangedListener((head) => {
-      console.log({head})
       block.value = head
     })
 
