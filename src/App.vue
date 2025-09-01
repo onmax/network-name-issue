@@ -4,31 +4,30 @@ import { Client, ClientConfiguration } from '@nimiq/core'
 
 const consensus = ref<'idle' | 'connecting' | 'established'>('idle')
 const client = ref<Client>()
-const isConnected = ref(false)
 const currentNetwork = ref<string>('')
 const selectedNetwork = ref('MainAlbatross')
-const isConnecting = ref(false)
+
+const block = ref<number>()
 
 const workingNetworks = [
   { value: 'MainAlbatross', label: 'MainAlbatross (UpperCamelCase)' },
-  { value: 'mainAlbatross', label: 'mainAlbatross (lowerCamelCase)' },
+  { value: 'mainalbatross', label: 'mainalbatross (lowercase)' },
+  { value: 'main-albatross', label: 'main-albatross (kebab-case)' },
 ]
 
 const brokenNetworks = [
   { value: 'TestAlbatross', label: 'TestAlbatross (UpperCamelCase)' },
   { value: 'testalbatross', label: 'testalbatross (lowercase)' },
   { value: 'test-albatross', label: 'test-albatross (kebab-case)' },
-  { value: 'main-albatross', label: 'main-albatross (kebab-case)' },
 ]
 
 async function connect() {
-  if (isConnecting.value || client.value) {
+  if (consensus.value !== 'idle') {
     console.log('Already connecting or connected, ignoring request')
     return
   }
 
   const networkName = selectedNetwork.value
-  isConnecting.value = true
   
   try {
     console.log(`Connecting to ${networkName}`)
@@ -44,17 +43,18 @@ async function connect() {
     client.value.addConsensusChangedListener((state) => {
       console.log(`${networkName}: ${state}`)
       consensus.value = state === 'syncing' ? 'connecting' : 'established'
-      isConnected.value = state === 'established'
+    })
+
+    client.value.addHeadChangedListener((head) => {
+      console.log({head})
+      block.value = head
     })
 
     currentNetwork.value = networkName
     
   } catch (error) {
     console.error(`Failed to connect to ${networkName}:`, error)
-    isConnected.value = false
     consensus.value = 'idle'
-  } finally {
-    isConnecting.value = false
   }
 }
 
@@ -71,9 +71,8 @@ async function cleanup() {
   
   // Reset all state
   consensus.value = 'idle'
-  isConnected.value = false
   currentNetwork.value = ''
-  isConnecting.value = false
+  block.value = undefined
 }
 
 // Cleanup on page unload/reload
@@ -81,6 +80,9 @@ onUnmounted(cleanup)
 
 // Also cleanup on page visibility change (when tab is hidden/closed)
 if (typeof window !== 'undefined') {
+  // Force cleanup on page load to reset any persisted state
+  cleanup()
+  
   window.addEventListener('beforeunload', cleanup)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
@@ -122,7 +124,7 @@ if (typeof window !== 'undefined') {
         <select 
           id="network-select" 
           v-model="selectedNetwork" 
-          :disabled="isConnected"
+          :disabled="consensus !== 'idle'"
           style="width: 100%; max-width: 350px; font-size: 0.85rem;"
         >
           <optgroup label="✅ Working Networks">
@@ -140,10 +142,10 @@ if (typeof window !== 'undefined') {
       
       <button 
         @click="connect" 
-        :disabled="isConnected || isConnecting"
+        :disabled="consensus !== 'idle'"
         style="margin-bottom: 1rem; min-width: 180px; font-size: 0.85rem; padding: 0.5rem 1rem;"
       >
-        {{ isConnected ? '✅ Connected' : isConnecting ? '⏳ Connecting...' : `🔗 Connect to ${selectedNetwork}` }}
+        {{ consensus !== 'idle' ? 'Disabled' : `🔗 Connect to ${selectedNetwork}` }}
       </button>
 
       <div v-if="currentNetwork" style="margin-top: 1rem;">
@@ -161,6 +163,12 @@ if (typeof window !== 'undefined') {
             <dt style="font-weight: 600; display: inline;">Consensus:</dt>
             <dd style="display: inline; margin-left: 0.5rem;">
               <code style="font-size: 0.8rem;">{{ consensus }}</code>
+            </dd>
+            <br>
+            
+            <dt style="font-weight: 600; display: inline;">Block:</dt>
+            <dd style="display: inline; margin-left: 0.5rem;">
+              <code style="font-size: 0.8rem;">{{ block ?? 'N/A' }}</code>
             </dd>
           </dl>
           <p style="margin-top: 0.8rem; margin-bottom: 0; font-size: 0.8rem;">
