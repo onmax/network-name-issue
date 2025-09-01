@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { Client, ClientConfiguration } from '@nimiq/core'
 
-enum ConsensusState {
-  Idle = 'idle',
-  Connecting = 'connecting',
-  Established = 'established',
-}
-
-const consensus = ref<ConsensusState>('idle')
+const consensus = ref<'idle' | 'connecting' | 'established'>('idle')
 const client = ref<Client>()
 const isConnected = ref(false)
 const currentNetwork = ref<string>('')
 const selectedNetwork = ref('MainAlbatross')
+const isConnecting = ref(false)
 
 const workingNetworks = [
   { value: 'MainAlbatross', label: 'MainAlbatross (UpperCamelCase)' },
@@ -27,8 +22,13 @@ const brokenNetworks = [
 ]
 
 async function connect() {
+  if (isConnecting.value || client.value) {
+    console.log('Already connecting or connected, ignoring request')
+    return
+  }
+
   const networkName = selectedNetwork.value
-  const isWorking = workingNetworks.some(n => n.value === networkName)
+  isConnecting.value = true
   
   try {
     console.log(`Connecting to ${networkName}`)
@@ -52,7 +52,41 @@ async function connect() {
   } catch (error) {
     console.error(`Failed to connect to ${networkName}:`, error)
     isConnected.value = false
+    consensus.value = 'idle'
+  } finally {
+    isConnecting.value = false
   }
+}
+
+async function cleanup() {
+  if (client.value) {
+    try {
+      console.log('Cleaning up client connection...')
+      await client.value.disconnectNetwork()
+    } catch (error) {
+      console.warn('Error during cleanup:', error)
+    }
+    client.value = undefined
+  }
+  
+  // Reset all state
+  consensus.value = 'idle'
+  isConnected.value = false
+  currentNetwork.value = ''
+  isConnecting.value = false
+}
+
+// Cleanup on page unload/reload
+onUnmounted(cleanup)
+
+// Also cleanup on page visibility change (when tab is hidden/closed)
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', cleanup)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      cleanup()
+    }
+  })
 }
 
 </script>
@@ -106,10 +140,10 @@ async function connect() {
       
       <button 
         @click="connect" 
-        :disabled="isConnected"
+        :disabled="isConnected || isConnecting"
         style="margin-bottom: 1rem; min-width: 180px; font-size: 0.85rem; padding: 0.5rem 1rem;"
       >
-        {{ isConnected ? '✅ Connected' : `🔗 Connect to ${selectedNetwork}` }}
+        {{ isConnected ? '✅ Connected' : isConnecting ? '⏳ Connecting...' : `🔗 Connect to ${selectedNetwork}` }}
       </button>
 
       <div v-if="currentNetwork" style="margin-top: 1rem;">
@@ -146,13 +180,6 @@ async function connect() {
         <li>Refresh the page to reset the connection</li>
         <li>Try the broken networks to see parsing failures</li>
       </ol>
-      <details style="margin-top: 0.8rem;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 0.85rem;">🔍 How to view console logs</summary>
-        <p style="margin-top: 0.4rem; margin-bottom: 0; font-size: 0.8rem; line-height: 1.4;">
-          Open browser developer tools (<kbd>F12</kbd> or <kbd>Ctrl+Shift+I</kbd>) and check the Console tab
-          to see detailed connection logs and error messages.
-        </p>
-      </details>
     </article>
   </main>
 </template>
