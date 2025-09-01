@@ -5,6 +5,9 @@ import vue from '@vitejs/plugin-vue'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), wasm()],
+  worker: {
+    plugins: () => [wasm()]
+  },
   optimizeDeps: {
     exclude: ['@nimiq/core'],
   },
