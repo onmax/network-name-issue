@@ -37,6 +37,17 @@ async function connect() {
     config.network(networkName)
     config.syncMode('pico')
     config.logLevel('debug')
+    
+    // Add testnet seed nodes if it's a test network
+    if (networkName.toLowerCase().includes('test')) {
+      const testnetSeeds = [
+        '/dns4/seed1.pos.nimiq-testnet.com/tcp/8443/wss',
+        '/dns4/seed2.pos.nimiq-testnet.com/tcp/8443/wss',
+        '/dns4/seed3.pos.nimiq-testnet.com/tcp/8443/wss',
+        '/dns4/seed4.pos.nimiq-testnet.com/tcp/8443/wss',
+      ]
+      config.seedNodes(testnetSeeds)
+    }
 
     client.value = await Client.create(config.build())
     
