@@ -5,9 +5,13 @@ import vue from '@vitejs/plugin-vue'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [wasm(), topLevelAwait(), vue()],
+  plugins: [wasm(), topLevelAwait({
+    promiseExportName: '__tla',
+    promiseImportName: i => `__tla_${i}`
+  }), vue()],
   worker: {
-    plugins: () => [wasm(), topLevelAwait()]
+    plugins: () => [wasm()],
+    format: 'es'
   },
   optimizeDeps: {
     exclude: ['@nimiq/core'],
